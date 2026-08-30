@@ -89,6 +89,9 @@ select {
 .print-report-logo {
   display: none;
 }
+#print-root {
+  display: none;
+}
 .splash-title {
   font-size: clamp(1.5rem, 4vw, 4rem);
   font-weight: 700;
@@ -116,30 +119,28 @@ select {
 @media print {
   @page {
     size: landscape;
-    margin: 0;
+    margin: 0.25in;
   }
+  html,
   body {
     background: white;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  body[data-print-view] * {
-    visibility: hidden;
-  }
-  body[data-print-view="dashboard"] [data-print-surface]:not([data-print-surface="dashboard"]),
-  body[data-print-view="projected"] [data-print-surface]:not([data-print-surface="projected"]),
-  body[data-print-view="sag"] [data-print-surface]:not([data-print-surface="sag"]),
-  body[data-print-view="consolidated"] [data-print-surface]:not([data-print-surface="consolidated"]) {
+  body[data-print-view] > #root {
     display: none !important;
   }
-  body[data-print-view] [data-print-surface],
-  body[data-print-view] [data-print-surface] * {
-    visibility: visible;
-  }
-  body[data-print-view] [data-print-surface] {
-    position: absolute;
-    inset: 0 auto auto 0;
+  body[data-print-view] > #print-root {
+    display: block !important;
     width: 100%;
     margin: 0 !important;
-    padding: 0.25in;
+    padding: 0 !important;
+  }
+  body[data-print-view] #print-root [data-print-surface] {
+    position: static;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
     box-sizing: border-box;
     border: 0 !important;
     border-radius: 0 !important;
@@ -147,18 +148,18 @@ select {
     box-shadow: none !important;
     overflow: visible !important;
   }
-  body[data-print-view] [data-print-surface] > div:last-child {
+  body[data-print-view] #print-root [data-print-surface] > div:last-child {
     overflow: visible !important;
   }
-  body[data-print-view] [data-print-surface] table {
+  body[data-print-view] #print-root [data-print-surface] table {
     width: 100% !important;
     min-width: 0 !important;
     font-size: 7px !important;
   }
-  body[data-print-view] [data-print-surface] h3 {
+  body[data-print-view] #print-root [data-print-surface] h3 {
     font-size: 15px;
   }
-  body[data-print-view] [data-print-surface] p {
+  body[data-print-view] #print-root [data-print-surface] p {
     font-size: 10px;
   }
   body[data-print-view] .print-report-header {

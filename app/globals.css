@@ -1,0 +1,190 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@custom-variant dark (&:is(.dark *));
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --font-sans: var(--font-geist-sans);
+}
+:root {
+  --background: oklch(0.975 0.012 90);
+  --foreground: oklch(0.23 0.025 150);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --primary: oklch(0.39 0.09 145);
+  --primary-foreground: oklch(0.98 0.01 90);
+  --secondary: oklch(0.93 0.025 90);
+  --secondary-foreground: oklch(0.28 0.03 145);
+  --muted: oklch(0.94 0.012 90);
+  --muted-foreground: oklch(0.5 0.025 145);
+  --border: oklch(0.86 0.018 90);
+  --input: var(--border);
+  --ring: oklch(0.55 0.1 145);
+  --destructive: oklch(0.58 0.2 28);
+  --radius: 0.75rem;
+}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  button {
+    cursor: pointer;
+  }
+}
+
+select {
+  background-color: #f3efe5 !important;
+}
+
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #18251d, #315844);
+  color: white;
+  text-align: center;
+}
+.splash-content {
+  display: grid;
+  justify-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  animation: splash-grow 7s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.splash-logo {
+  width: clamp(7rem, 18vw, 15rem);
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  border: 4px solid rgb(213 168 79 / 85%);
+  object-fit: cover;
+  box-shadow: 0 16px 45px rgb(0 0 0 / 35%);
+}
+
+.print-report-logo {
+  display: none;
+}
+.splash-title {
+  font-size: clamp(1.5rem, 4vw, 4rem);
+  font-weight: 700;
+  line-height: 1.15;
+  text-shadow: 0 6px 22px rgb(0 0 0 / 30%);
+}
+@keyframes splash-grow {
+  0% {
+    opacity: 0;
+    transform: scale(0.28);
+  }
+  12% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+  body {
+    background: white;
+  }
+  body[data-print-view] * {
+    visibility: hidden;
+  }
+  body[data-print-view] [data-print-surface],
+  body[data-print-view] [data-print-surface] * {
+    visibility: visible;
+  }
+  body[data-print-view] [data-print-surface] {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0.25in;
+    box-sizing: border-box;
+    border: 0 !important;
+    border-radius: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+  body[data-print-view] [data-print-surface] > div:last-child {
+    overflow: visible !important;
+  }
+  body[data-print-view] [data-print-surface] table {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 7px !important;
+  }
+  body[data-print-view] [data-print-surface] h3 {
+    font-size: 15px;
+  }
+  body[data-print-view] [data-print-surface] p {
+    font-size: 10px;
+  }
+  body[data-print-view] .print-report-header {
+    position: relative;
+    min-height: 0.55in;
+    padding-right: 0.8in !important;
+  }
+  body[data-print-view] .print-report-logo {
+    display: block;
+    position: absolute;
+    top: 0.08in;
+    right: 0.08in;
+    width: 0.55in;
+    height: 0.55in;
+    object-fit: contain;
+  }
+  body[data-print-view],
+  body[data-print-view] * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+  table {
+    font-size: 8px;
+  }
+  th,
+  td {
+    padding: 4px !important;
+  }
+  section {
+    box-shadow: none !important;
+  }
+}

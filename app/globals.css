@@ -124,6 +124,12 @@ select {
   body[data-print-view] * {
     visibility: hidden;
   }
+  body[data-print-view="dashboard"] [data-print-surface]:not([data-print-surface="dashboard"]),
+  body[data-print-view="projected"] [data-print-surface]:not([data-print-surface="projected"]),
+  body[data-print-view="sag"] [data-print-surface]:not([data-print-surface="sag"]),
+  body[data-print-view="consolidated"] [data-print-surface]:not([data-print-surface="consolidated"]) {
+    display: none !important;
+  }
   body[data-print-view] [data-print-surface],
   body[data-print-view] [data-print-surface] * {
     visibility: visible;
@@ -188,3 +194,4 @@ select {
     box-shadow: none !important;
   }
 }
+

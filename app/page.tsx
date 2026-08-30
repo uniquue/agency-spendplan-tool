@@ -639,6 +639,11 @@ export default function Home() {
                 </Button>
               ))}
             </nav>
+            <p className="mt-2 text-xs text-muted-foreground print:hidden">
+              Printing note: In the print dialog, expand{' '}
+              <strong>More settings</strong> and turn off{' '}
+              <strong>Headers and footers</strong>.
+            </p>
             {activeView === 'dashboard' && (
               <div className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 print:hidden">
                 <label className="grid gap-1 text-sm font-medium">

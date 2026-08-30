@@ -131,6 +131,9 @@ export default function Home() {
   >('COM');
   const [selectedSag, setSelectedSag] = useState('ALL');
   const [selectedDirDas, setSelectedDirDas] = useState('ALL');
+  const [projectedDirSort, setProjectedDirSort] = useState<'asc' | 'desc'>(
+    'asc',
+  );
   const [dashboardDirDas, setDashboardDirDas] = useState('ALL');
   const [dashboardObjectClass, setDashboardObjectClass] = useState('ALL');
   const [dashboardFundingType, setDashboardFundingType] = useState<
@@ -251,7 +254,7 @@ export default function Home() {
           : dirs.length > 1
             ? 'Multiple matches'
             : 'Unmatched';
-      const dirDas = dirs.length ? dirs.join(' / ') : 'No DIR/DAS match';
+      const dirDas = dirs.length ? dirs.join(' / ') : 'No DIR/DASA match';
       const groupKey = [objectClass, comObl, functionalArea, dirDas].join('|');
       const monthly = months.map((month) => amount(field(row, month)));
       const existing = map.get(groupKey) ?? {
@@ -361,14 +364,25 @@ export default function Home() {
             functionalArea,
             objectClass: text(field(row, 'OBJECT CLASS')) || 'Unspecified',
             comObl,
-            dirDas: dirs.join(' / ') || 'No DIR/DAS match',
+            dirDas: dirs.join(' / ') || 'No DIR/DASA match',
             months: monthsValues,
             total: monthsValues[monthsValues.length - 1] ?? 0,
           },
         ];
       })
-      .sort((a, b) => b.total - a.total);
-  }, [spendRows, apeRows, selectedDirDas, selectedDirDasComObl]);
+      .sort((a, b) => {
+        const byDir = a.dirDas.localeCompare(b.dirDas, undefined, {
+          numeric: true,
+        });
+        return (projectedDirSort === 'asc' ? byDir : -byDir) || b.total - a.total;
+      });
+  }, [
+    spendRows,
+    apeRows,
+    selectedDirDas,
+    selectedDirDasComObl,
+    projectedDirSort,
+  ]);
   const dashboardRows = useMemo<DashboardRow[]>(() => {
     const map = new Map<string, DashboardRow>();
     results.forEach((row) => {
@@ -528,7 +542,7 @@ export default function Home() {
           </h2>
           <p className="mt-3 text-muted-foreground">
             Upload the spend plan and the APE lookup. The tool consolidates
-            Object Class, COM/OBL, Functional Area, DIR/DAS, and every month in
+            Object Class, COM/OBL, Functional Area, DIR/DASA, and every month in
             your browser.
           </p>
         </div>
@@ -542,7 +556,7 @@ export default function Home() {
           />
           <UploadCard
             title="2. Upload APE Lookup"
-            description="APE-to-DIR/DAS reference workbook"
+            description="APE-to-DIR/DASA reference workbook"
             name={apeName}
             ready={!!apeRows.length}
             onClick={() => apeInput.current?.click()}
@@ -580,7 +594,7 @@ export default function Home() {
                 icon={Layers3}
               />
               <Stat
-                label="DIR/DAS review items"
+                label="DIR/DASA review items"
                 value={String(flagged)}
                 icon={AlertTriangle}
               />
@@ -598,7 +612,7 @@ export default function Home() {
                     {flagged} record{flagged === 1 ? '' : 's'}
                   </strong>{' '}
                   need review because the APE reference has no match or more
-                  than one DIR/DAS candidate. They remain visible in the results
+                  than one DIR/DASA candidate. They remain visible in the results
                   instead of being assigned automatically.
                 </span>
               </div>
@@ -628,13 +642,13 @@ export default function Home() {
             {activeView === 'dashboard' && (
               <div className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 print:hidden">
                 <label className="grid gap-1 text-sm font-medium">
-                  DIR/DAS
+                  DIR/DASA
                   <select
                     value={dashboardDirDas}
                     onChange={(event) => setDashboardDirDas(event.target.value)}
                     className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="ALL">All DIR/DAS</option>
+                    <option value="ALL">All DIR/DASA</option>
                     {dashboardDirDasOptions.map((option) => (
                       <option key={option} value={option}>
                         {option}
@@ -704,7 +718,7 @@ export default function Home() {
                     {fiscalYear} Budget Execution Dashboard
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Agency-wide cumulative execution by DIR/DAS, Object Class,
+                    Agency-wide cumulative execution by DIR/DASA, Object Class,
                     COM/OBL, and month.
                   </p>
                 </div>
@@ -712,7 +726,7 @@ export default function Home() {
                   <table className="w-full text-[10px] xl:text-[11px]">
                     <thead className="bg-primary text-left text-primary-foreground">
                       <tr>
-                        {['DIR/DAS', 'Object Class', 'COM/OBL', ...months].map(
+                        {['DIR/DASA', 'Object Class', 'COM/OBL', ...months].map(
                           (header) => (
                             <th
                               key={header}
@@ -814,7 +828,7 @@ export default function Home() {
               <div className="mt-5 flex flex-wrap items-end justify-between gap-3 rounded-xl border bg-card p-4 print:hidden">
                 <div className="flex flex-wrap items-end gap-3">
                   <label className="grid gap-1 text-sm font-medium">
-                    DIR/DAS
+                    DIR/DASA
                     <select
                       value={selectedDirDas}
                       onChange={(event) =>
@@ -822,7 +836,7 @@ export default function Home() {
                       }
                       className="h-10 min-w-36 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
                     >
-                      <option value="ALL">All DIR/DAS</option>
+                      <option value="ALL">All DIR/DASA</option>
                       {dirDasOptions.map((option) => (
                         <option key={option} value={option}>
                           {option}
@@ -834,6 +848,18 @@ export default function Home() {
                     value={selectedDirDasComObl}
                     onChange={setSelectedDirDasComObl}
                   />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setProjectedDirSort((value) =>
+                        value === 'asc' ? 'desc' : 'asc',
+                      )
+                    }
+                  >
+                    DIR/DASA {projectedDirSort === 'asc' ? 'A–Z' : 'Z–A'}
+                  </Button>
                 </div>
                 <Button
                   variant="outline"
@@ -842,7 +868,7 @@ export default function Home() {
                   <Printer /> Print{' '}
                   {activeView === 'projected'
                     ? 'projected execution'
-                    : 'DIR/DAS'}
+                    : 'DIR/DASA'}
                 </Button>
               </div>
             )}
@@ -899,12 +925,12 @@ export default function Home() {
                   alt="Executive Services Directorate logo"
                 />
                 <h3 className="font-semibold">
-                  {fiscalYear} Projected Execution by DIR/DAS
+                  {fiscalYear} Projected Execution by DIR/DASA
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Requirement-level projected execution for{' '}
                   {selectedDirDas === 'ALL'
-                    ? 'all DIR/DAS organizations'
+                    ? 'all DIR/DASA organizations'
                     : selectedDirDas}
                   , filtered to {selectedDirDasComObl}.
                 </p>
@@ -914,7 +940,7 @@ export default function Home() {
                   <thead className="bg-muted/60 text-left">
                     <tr>
                       {[
-                        'DIR/DAS',
+                        'DIR/DASA',
                         'Requirement / Contract Name',
                         'MDEP',
                         'SAG',
@@ -950,7 +976,7 @@ export default function Home() {
                         </td>
                         <td className="px-3 py-3 font-mono">{row.mdep}</td>
                         <td className="px-3 py-3 font-mono">{row.sag}</td>
-                        <td className="px-3 py-3 font-mono text-xs">
+                        <td className="px-3 py-3 font-mono">
                           {row.functionalArea}
                         </td>
                         <td className="px-3 py-3">{row.objectClass}</td>
@@ -1026,7 +1052,7 @@ export default function Home() {
                           className="px-3 py-8 text-center text-muted-foreground"
                         >
                           No projected execution records match the current
-                          DIR/DAS and funding type selections.
+                          DIR/DASA and funding type selections.
                         </td>
                       </tr>
                     )}
@@ -1049,7 +1075,7 @@ export default function Home() {
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   A high-level {selectedSagComObl} view by Object Class, SAG,
-                  and DIR/DAS (such as CE and FOI). Functional Area detail is
+                  and DIR/DASA (such as CE and FOI). Functional Area detail is
                   rolled into each SAG.
                 </p>
               </div>
@@ -1058,7 +1084,7 @@ export default function Home() {
                   <thead className="bg-primary text-left text-primary-foreground">
                     <tr>
                       {[
-                        'DIR/DAS',
+                        'DIR/DASA',
                         'Object Class',
                         'COM/OBL',
                         'SAG',
@@ -1181,7 +1207,7 @@ export default function Home() {
                   <thead className="bg-muted/60 text-left">
                     <tr>
                       {[
-                        'DIR/DAS',
+                        'DIR/DASA',
                         'Object Class',
                         'COM/OBL',
                         'Functional Area',

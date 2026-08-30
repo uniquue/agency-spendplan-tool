@@ -187,7 +187,18 @@ export default function Home() {
 
   function printCard(view: DashboardView) {
     const previousTitle = document.title;
+    const source = document.querySelector<HTMLElement>(
+      `[data-print-surface="${view}"]`,
+    );
+    if (!source) return;
+
+    const printRoot = document.createElement('div');
+    printRoot.id = 'print-root';
+    printRoot.appendChild(source.cloneNode(true));
+    document.body.appendChild(printRoot);
+
     const cleanup = () => {
+      printRoot.remove();
       delete document.body.dataset.printView;
       document.title = previousTitle;
       window.removeEventListener('afterprint', cleanup);
@@ -1377,3 +1388,4 @@ function Stat({
     </div>
   );
 }
+

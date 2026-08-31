@@ -190,6 +190,9 @@ export default function Home() {
 
   function printCard(view: DashboardView) {
     const previousTitle = document.title;
+    document
+      .querySelectorAll('#print-root')
+      .forEach((existingPrintRoot) => existingPrintRoot.remove());
     const source = document.querySelector<HTMLElement>(
       `[data-print-surface="${view}"]`,
     );

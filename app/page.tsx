@@ -171,10 +171,11 @@ export default function Home() {
     'COM',
   );
   const [schedulePeriodType, setSchedulePeriodType] = useState<
-    'month' | 'quarter' | 'range'
+    'month' | 'quarter' | 'semiAnnual' | 'annual' | 'range'
   >('month');
   const [scheduleMonth, setScheduleMonth] = useState(0);
   const [scheduleQuarter, setScheduleQuarter] = useState(0);
+  const [scheduleHalf, setScheduleHalf] = useState(0);
   const [scheduleStartMonth, setScheduleStartMonth] = useState(0);
   const [scheduleMonthCount, setScheduleMonthCount] = useState(3);
   const [dashboardDirDas, setDashboardDirDas] = useState('ALL');
@@ -551,6 +552,13 @@ export default function Home() {
       const start = scheduleQuarter * 3;
       return [start, start + 1, start + 2];
     }
+    if (schedulePeriodType === 'semiAnnual') {
+      const start = scheduleHalf * 6;
+      return Array.from({ length: 6 }, (_, index) => start + index);
+    }
+    if (schedulePeriodType === 'annual') {
+      return Array.from({ length: months.length }, (_, index) => index);
+    }
     const count = Math.max(
       1,
       Math.min(scheduleMonthCount, months.length - scheduleStartMonth),
@@ -560,6 +568,7 @@ export default function Home() {
     schedulePeriodType,
     scheduleMonth,
     scheduleQuarter,
+    scheduleHalf,
     scheduleStartMonth,
     scheduleMonthCount,
   ]);
@@ -1214,13 +1223,20 @@ export default function Home() {
                       value={schedulePeriodType}
                       onChange={(event) =>
                         setSchedulePeriodType(
-                          event.target.value as 'month' | 'quarter' | 'range',
+                          event.target.value as
+                            | 'month'
+                            | 'quarter'
+                            | 'semiAnnual'
+                            | 'annual'
+                            | 'range',
                         )
                       }
                       className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="month">One month</option>
                       <option value="quarter">Quarter</option>
+                      <option value="semiAnnual">Semi-Annual</option>
+                      <option value="annual">Annual</option>
                       <option value="range">Number of months</option>
                     </select>
                   </label>
@@ -1256,6 +1272,21 @@ export default function Home() {
                         <option value={1}>Q2 (JAN–MAR)</option>
                         <option value={2}>Q3 (APR–JUN)</option>
                         <option value={3}>Q4 (JUL–SEP)</option>
+                      </select>
+                    </label>
+                  )}
+                  {schedulePeriodType === 'semiAnnual' && (
+                    <label className="grid gap-1 text-sm font-medium">
+                      Semi-Annual period
+                      <select
+                        value={scheduleHalf}
+                        onChange={(event) =>
+                          setScheduleHalf(Number(event.target.value))
+                        }
+                        className="h-10 min-w-44 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value={0}>First Half (OCT–MAR)</option>
+                        <option value={1}>Second Half (APR–SEP)</option>
                       </select>
                     </label>
                   )}

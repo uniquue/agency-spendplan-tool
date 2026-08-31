@@ -50,7 +50,12 @@ type DashboardRow = {
   comObl: string;
   months: number[];
 };
-type DashboardView = 'dashboard' | 'projected' | 'sag' | 'consolidated';
+type DashboardView =
+  | 'dashboard'
+  | 'projected'
+  | 'sag'
+  | 'consolidated'
+  | 'schedule';
 const months = [
   'OCT',
   'NOV',
@@ -159,6 +164,19 @@ export default function Home() {
   const [consolidatedSortDirection, setConsolidatedSortDirection] = useState<
     'asc' | 'desc'
   >('asc');
+  const [scheduleGroupBy, setScheduleGroupBy] = useState<'sag' | 'dirDas'>(
+    'dirDas',
+  );
+  const [scheduleFundingType, setScheduleFundingType] = useState<'COM' | 'OBL'>(
+    'COM',
+  );
+  const [schedulePeriodType, setSchedulePeriodType] = useState<
+    'month' | 'quarter' | 'range'
+  >('month');
+  const [scheduleMonth, setScheduleMonth] = useState(0);
+  const [scheduleQuarter, setScheduleQuarter] = useState(0);
+  const [scheduleStartMonth, setScheduleStartMonth] = useState(0);
+  const [scheduleMonthCount, setScheduleMonthCount] = useState(3);
   const [dashboardDirDas, setDashboardDirDas] = useState('ALL');
   const [dashboardObjectClass, setDashboardObjectClass] = useState('ALL');
   const [dashboardFundingType, setDashboardFundingType] = useState<
@@ -527,6 +545,61 @@ export default function Home() {
     [dashboardTotalRows],
   );
   const dashboardFyTotal = dashboardTotals[dashboardTotals.length - 1] ?? 0;
+  const scheduleMonthIndexes = useMemo(() => {
+    if (schedulePeriodType === 'month') return [scheduleMonth];
+    if (schedulePeriodType === 'quarter') {
+      const start = scheduleQuarter * 3;
+      return [start, start + 1, start + 2];
+    }
+    const count = Math.max(
+      1,
+      Math.min(scheduleMonthCount, months.length - scheduleStartMonth),
+    );
+    return Array.from({ length: count }, (_, index) => scheduleStartMonth + index);
+  }, [
+    schedulePeriodType,
+    scheduleMonth,
+    scheduleQuarter,
+    scheduleStartMonth,
+    scheduleMonthCount,
+  ]);
+  const scheduleRows = useMemo(() => {
+    const grouped = new Map<string, number[]>();
+    results
+      .filter((row) => keyText(row.comObl) === scheduleFundingType)
+      .forEach((row) => {
+        const group = row[scheduleGroupBy] || 'Unspecified';
+        const current = grouped.get(group) ?? Array(scheduleMonthIndexes.length).fill(0);
+        scheduleMonthIndexes.forEach((monthIndex, displayIndex) => {
+          const prior = monthIndex === 0 ? 0 : row.months[monthIndex - 1] ?? 0;
+          current[displayIndex] += (row.months[monthIndex] ?? 0) - prior;
+        });
+        grouped.set(group, current);
+      });
+    return [...grouped.entries()]
+      .map(([group, values]) => ({
+        group,
+        values,
+        total: values.reduce((sum, value) => sum + value, 0),
+      }))
+      .sort((a, b) => compareText(a.group, b.group, 'asc'));
+  }, [
+    results,
+    scheduleFundingType,
+    scheduleGroupBy,
+    scheduleMonthIndexes,
+  ]);
+  const scheduleTotals = useMemo(
+    () =>
+      scheduleMonthIndexes.map((_, index) =>
+        scheduleRows.reduce((sum, row) => sum + row.values[index], 0),
+      ),
+    [scheduleRows, scheduleMonthIndexes],
+  );
+  const scheduleGrandTotal = scheduleTotals.reduce(
+    (sum, value) => sum + value,
+    0,
+  );
   const projectedTotals = useMemo(
     () =>
       months.map((_, index) =>
@@ -704,6 +777,7 @@ export default function Home() {
                   ['projected', 'Projected execution'],
                   ['sag', 'View SAG'],
                   ['consolidated', 'Consolidated plan'],
+                  ['schedule', 'Funding schedule'],
                 ] as const
               ).map(([view, label]) => (
                 <Button
@@ -1112,6 +1186,201 @@ export default function Home() {
                 </Button>
               </div>
             )}
+            {activeView === 'schedule' && (
+              <div className="mt-5 flex flex-wrap items-end justify-between gap-3 rounded-xl border bg-card p-4 print:hidden">
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="grid gap-1 text-sm font-medium">
+                    Group by
+                    <select
+                      value={scheduleGroupBy}
+                      onChange={(event) =>
+                        setScheduleGroupBy(
+                          event.target.value as 'sag' | 'dirDas',
+                        )
+                      }
+                      className="h-10 min-w-36 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="dirDas">DIR/DASA</option>
+                      <option value="sag">SAG</option>
+                    </select>
+                  </label>
+                  <FundingTypeButtons
+                    value={scheduleFundingType}
+                    onChange={setScheduleFundingType}
+                  />
+                  <label className="grid gap-1 text-sm font-medium">
+                    Period
+                    <select
+                      value={schedulePeriodType}
+                      onChange={(event) =>
+                        setSchedulePeriodType(
+                          event.target.value as 'month' | 'quarter' | 'range',
+                        )
+                      }
+                      className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="month">One month</option>
+                      <option value="quarter">Quarter</option>
+                      <option value="range">Number of months</option>
+                    </select>
+                  </label>
+                  {schedulePeriodType === 'month' && (
+                    <label className="grid gap-1 text-sm font-medium">
+                      Month
+                      <select
+                        value={scheduleMonth}
+                        onChange={(event) =>
+                          setScheduleMonth(Number(event.target.value))
+                        }
+                        className="h-10 min-w-28 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        {months.map((month, index) => (
+                          <option key={month} value={index}>
+                            {month}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {schedulePeriodType === 'quarter' && (
+                    <label className="grid gap-1 text-sm font-medium">
+                      Quarter
+                      <select
+                        value={scheduleQuarter}
+                        onChange={(event) =>
+                          setScheduleQuarter(Number(event.target.value))
+                        }
+                        className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value={0}>Q1 (OCT–DEC)</option>
+                        <option value={1}>Q2 (JAN–MAR)</option>
+                        <option value={2}>Q3 (APR–JUN)</option>
+                        <option value={3}>Q4 (JUL–SEP)</option>
+                      </select>
+                    </label>
+                  )}
+                  {schedulePeriodType === 'range' && (
+                    <>
+                      <label className="grid gap-1 text-sm font-medium">
+                        Starting month
+                        <select
+                          value={scheduleStartMonth}
+                          onChange={(event) =>
+                            setScheduleStartMonth(Number(event.target.value))
+                          }
+                          className="h-10 min-w-32 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          {months.map((month, index) => (
+                            <option key={month} value={index}>
+                              {month}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="grid gap-1 text-sm font-medium">
+                        Number of months
+                        <select
+                          value={Math.min(
+                            scheduleMonthCount,
+                            months.length - scheduleStartMonth,
+                          )}
+                          onChange={(event) =>
+                            setScheduleMonthCount(Number(event.target.value))
+                          }
+                          className="h-10 min-w-28 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          {Array.from(
+                            { length: months.length - scheduleStartMonth },
+                            (_, index) => index + 1,
+                          ).map((count) => (
+                            <option key={count} value={count}>
+                              {count}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </>
+                  )}
+                </div>
+                <Button variant="outline" onClick={() => printCard('schedule')}>
+                  <Printer /> Print funding schedule
+                </Button>
+              </div>
+            )}
+            <section
+              data-print-surface="schedule"
+              className={`${activeView === 'schedule' ? 'block' : 'hidden'} mt-6 overflow-hidden rounded-2xl border bg-card shadow-sm`}
+            >
+              <div className="print-report-header border-b p-5">
+                <img
+                  className="print-report-logo"
+                  src="/esd-logo.png"
+                  alt="Executive Services Directorate logo"
+                />
+                <h3 className="font-semibold">
+                  {fiscalYear} Planned Funding Schedule by{' '}
+                  {scheduleGroupBy === 'dirDas' ? 'DIR/DASA' : 'SAG'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Planned {scheduleFundingType} receipts are calculated as the
+                  change in the cumulative Spend Plan balance for each month.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] text-sm">
+                  <thead className="bg-primary text-primary-foreground">
+                    <tr>
+                      <th className="border-b border-white/10 px-3 py-3 text-left font-semibold">
+                        {scheduleGroupBy === 'dirDas' ? 'DIR/DASA' : 'SAG'}
+                      </th>
+                      {scheduleMonthIndexes.map((monthIndex) => (
+                        <th
+                          key={monthIndex}
+                          className="whitespace-nowrap border-b border-white/10 px-3 py-3 text-center font-semibold"
+                        >
+                          {months[monthIndex]}
+                        </th>
+                      ))}
+                      <th className="whitespace-nowrap border-b border-white/10 px-3 py-3 text-center font-semibold">
+                        Selected period total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scheduleRows.map((row) => (
+                      <tr key={row.group} className="border-b last:border-0">
+                        <td className="px-3 py-3 font-medium">{row.group}</td>
+                        {row.values.map((value, index) => (
+                          <td
+                            key={scheduleMonthIndexes[index]}
+                            className="whitespace-nowrap px-3 py-3 text-right tabular-nums"
+                          >
+                            {currency(value)}
+                          </td>
+                        ))}
+                        <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums">
+                          {currency(row.total)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-[#142541] text-white">
+                      <td className="px-3 py-3 font-semibold">Agency total</td>
+                      {scheduleTotals.map((value, index) => (
+                        <td
+                          key={scheduleMonthIndexes[index]}
+                          className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums"
+                        >
+                          {currency(value)}
+                        </td>
+                      ))}
+                      <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums">
+                        {currency(scheduleGrandTotal)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
             <section
               data-print-surface="projected"
               className={`${activeView === 'projected' ? 'block' : 'hidden'} mt-6 overflow-hidden rounded-2xl border bg-card shadow-sm`}

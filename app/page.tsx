@@ -81,6 +81,10 @@ function text(value: unknown) {
 function keyText(value: unknown) {
   return text(value).replace(/\s+/g, '').toUpperCase();
 }
+function compareText(a: string, b: string, direction: 'asc' | 'desc') {
+  const order = a.localeCompare(b, undefined, { numeric: true });
+  return direction === 'asc' ? order : -order;
+}
 function amount(value: unknown) {
   if (typeof value === 'number') return value;
   const raw = text(value).replace(/[$,\s]/g, '');
@@ -131,11 +135,26 @@ export default function Home() {
   >('COM');
   const [selectedSag, setSelectedSag] = useState('ALL');
   const [selectedDirDas, setSelectedDirDas] = useState('ALL');
-  const [projectedDirSort, setProjectedDirSort] = useState<'asc' | 'desc'>(
+  const [dashboardSortField, setDashboardSortField] = useState<
+    'dirDas' | 'objectClass' | 'comObl'
+  >('dirDas');
+  const [dashboardSortDirection, setDashboardSortDirection] = useState<
+    'asc' | 'desc'
+  >('asc');
+  const [projectedSortField, setProjectedSortField] = useState<
+    'dirDas' | 'mdep' | 'sag' | 'functionalArea' | 'objectClass'
+  >('dirDas');
+  const [projectedSortDirection, setProjectedSortDirection] = useState<
+    'asc' | 'desc'
+  >('asc');
+  const [sagSortField, setSagSortField] = useState<
+    'dirDas' | 'objectClass' | 'comObl' | 'sag'
+  >('dirDas');
+  const [sagSortDirection, setSagSortDirection] = useState<'asc' | 'desc'>(
     'asc',
   );
   const [consolidatedSortField, setConsolidatedSortField] = useState<
-    'dirDas' | 'objectClass'
+    'dirDas' | 'objectClass' | 'comObl' | 'functionalArea' | 'status'
   >('dirDas');
   const [consolidatedSortDirection, setConsolidatedSortDirection] = useState<
     'asc' | 'desc'
@@ -309,16 +328,12 @@ export default function Home() {
   const sortedFilteredResults = useMemo(
     () =>
       [...filteredResults].sort((a, b) => {
-        const primary = a[consolidatedSortField].localeCompare(
+        const primary = compareText(
+          a[consolidatedSortField],
           b[consolidatedSortField],
-          undefined,
-          { numeric: true },
+          consolidatedSortDirection,
         );
-        const secondary = a.dirDas.localeCompare(b.dirDas, undefined, {
-          numeric: true,
-        });
-        const order = primary || secondary;
-        return consolidatedSortDirection === 'asc' ? order : -order;
+        return primary || compareText(a.dirDas, b.dirDas, 'asc');
       }),
     [filteredResults, consolidatedSortField, consolidatedSortDirection],
   );
@@ -362,8 +377,15 @@ export default function Home() {
       existing.total = existing.months[existing.months.length - 1];
       map.set(groupKey, existing);
     });
-    return [...map.values()].sort((a, b) => b.total - a.total);
-  }, [sagResults]);
+    return [...map.values()].sort((a, b) => {
+      const primary = compareText(
+        a[sagSortField],
+        b[sagSortField],
+        sagSortDirection,
+      );
+      return primary || compareText(a.dirDas, b.dirDas, 'asc');
+    });
+  }, [sagResults, sagSortField, sagSortDirection]);
   const projectedDirRows = useMemo<ProjectedExecutionRow[]>(() => {
     if (!spendRows.length || !apeRows.length) return [];
     const field = (row: Row, name: string) =>
@@ -412,17 +434,20 @@ export default function Home() {
         ];
       })
       .sort((a, b) => {
-        const byDir = a.dirDas.localeCompare(b.dirDas, undefined, {
-          numeric: true,
-        });
-        return (projectedDirSort === 'asc' ? byDir : -byDir) || b.total - a.total;
+        const primary = compareText(
+          a[projectedSortField],
+          b[projectedSortField],
+          projectedSortDirection,
+        );
+        return primary || compareText(a.dirDas, b.dirDas, 'asc');
       });
   }, [
     spendRows,
     apeRows,
     selectedDirDas,
     selectedDirDasComObl,
-    projectedDirSort,
+    projectedSortField,
+    projectedSortDirection,
   ]);
   const dashboardRows = useMemo<DashboardRow[]>(() => {
     const map = new Map<string, DashboardRow>();
@@ -459,19 +484,30 @@ export default function Home() {
   );
   const visibleDashboardRows = useMemo(
     () =>
-      dashboardRows.filter(
-        (row) =>
-          (dashboardDirDas === 'ALL' || row.dirDas === dashboardDirDas) &&
-          (dashboardObjectClass === 'ALL' ||
-            row.objectClass === dashboardObjectClass) &&
-          (dashboardFundingType === 'ALL' ||
-            keyText(row.comObl) === dashboardFundingType),
-      ),
+      dashboardRows
+        .filter(
+          (row) =>
+            (dashboardDirDas === 'ALL' || row.dirDas === dashboardDirDas) &&
+            (dashboardObjectClass === 'ALL' ||
+              row.objectClass === dashboardObjectClass) &&
+            (dashboardFundingType === 'ALL' ||
+              keyText(row.comObl) === dashboardFundingType),
+        )
+        .sort((a, b) => {
+          const primary = compareText(
+            a[dashboardSortField],
+            b[dashboardSortField],
+            dashboardSortDirection,
+          );
+          return primary || compareText(a.dirDas, b.dirDas, 'asc');
+        }),
     [
       dashboardRows,
       dashboardDirDas,
       dashboardObjectClass,
       dashboardFundingType,
+      dashboardSortField,
+      dashboardSortDirection,
     ],
   );
   const dashboardTotalRows = useMemo(
@@ -740,6 +776,35 @@ export default function Home() {
                     ))}
                   </div>
                 </fieldset>
+                <label className="grid gap-1 text-sm font-medium">
+                  Sort by
+                  <select
+                    value={dashboardSortField}
+                    onChange={(event) =>
+                      setDashboardSortField(
+                        event.target.value as
+                          | 'dirDas'
+                          | 'objectClass'
+                          | 'comObl',
+                      )
+                    }
+                    className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="dirDas">DIR/DASA</option>
+                    <option value="objectClass">Object Class</option>
+                    <option value="comObl">COM/OBL</option>
+                  </select>
+                </label>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setDashboardSortDirection((current) =>
+                      current === 'asc' ? 'desc' : 'asc',
+                    )
+                  }
+                >
+                  {dashboardSortDirection === 'asc' ? 'A–Z' : 'Z–A'}
+                </Button>
                 <Button
                   className="ml-auto"
                   variant="outline"
@@ -894,17 +959,38 @@ export default function Home() {
                     value={selectedDirDasComObl}
                     onChange={setSelectedDirDasComObl}
                   />
+                  <label className="grid gap-1 text-sm font-medium">
+                    Sort by
+                    <select
+                      value={projectedSortField}
+                      onChange={(event) =>
+                        setProjectedSortField(
+                          event.target.value as
+                            | 'dirDas'
+                            | 'mdep'
+                            | 'sag'
+                            | 'functionalArea'
+                            | 'objectClass',
+                        )
+                      }
+                      className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="dirDas">DIR/DASA</option>
+                      <option value="mdep">MDEP</option>
+                      <option value="sag">SAG</option>
+                      <option value="functionalArea">Functional Area</option>
+                      <option value="objectClass">Object Class</option>
+                    </select>
+                  </label>
                   <Button
-                    type="button"
-                    size="sm"
                     variant="outline"
                     onClick={() =>
-                      setProjectedDirSort((value) =>
-                        value === 'asc' ? 'desc' : 'asc',
+                      setProjectedSortDirection((current) =>
+                        current === 'asc' ? 'desc' : 'asc',
                       )
                     }
                   >
-                    DIR/DASA {projectedDirSort === 'asc' ? 'A–Z' : 'Z–A'}
+                    {projectedSortDirection === 'asc' ? 'A–Z' : 'Z–A'}
                   </Button>
                 </div>
                 <Button
@@ -940,6 +1026,37 @@ export default function Home() {
                     value={selectedSagComObl}
                     onChange={setSelectedSagComObl}
                   />
+                  <label className="grid gap-1 text-sm font-medium">
+                    Sort by
+                    <select
+                      value={sagSortField}
+                      onChange={(event) =>
+                        setSagSortField(
+                          event.target.value as
+                            | 'dirDas'
+                            | 'objectClass'
+                            | 'comObl'
+                            | 'sag',
+                        )
+                      }
+                      className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="dirDas">DIR/DASA</option>
+                      <option value="objectClass">Object Class</option>
+                      <option value="comObl">COM/OBL</option>
+                      <option value="sag">SAG</option>
+                    </select>
+                  </label>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setSagSortDirection((current) =>
+                        current === 'asc' ? 'desc' : 'asc',
+                      )
+                    }
+                  >
+                    {sagSortDirection === 'asc' ? 'A–Z' : 'Z–A'}
+                  </Button>
                 </div>
                 <Button variant="outline" onClick={() => printCard('sag')}>
                   <Printer /> Print SAG
@@ -959,13 +1076,21 @@ export default function Home() {
                       value={consolidatedSortField}
                       onChange={(event) =>
                         setConsolidatedSortField(
-                          event.target.value as 'dirDas' | 'objectClass',
+                          event.target.value as
+                            | 'dirDas'
+                            | 'objectClass'
+                            | 'comObl'
+                            | 'functionalArea'
+                            | 'status',
                         )
                       }
                       className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="dirDas">DIR/DASA</option>
                       <option value="objectClass">Object Class</option>
+                      <option value="comObl">COM/OBL</option>
+                      <option value="functionalArea">Functional Area</option>
+                      <option value="status">Status</option>
                     </select>
                   </label>
                   <Button

@@ -188,7 +188,7 @@ export default function Home() {
     }
   }
 
-  function printCard(view: DashboardView) {
+  async function printCard(view: DashboardView) {
     const previousTitle = document.title;
     document
       .querySelectorAll('#print-root')
@@ -212,6 +212,22 @@ export default function Home() {
     document.body.dataset.printView = view;
     document.title = '';
     window.addEventListener('afterprint', cleanup);
+
+    await document.fonts?.ready;
+    await Promise.all(
+      Array.from(printRoot.querySelectorAll('img')).map(async (image) => {
+        if (image.complete) return;
+        try {
+          await image.decode();
+        } catch {
+          // Printing can continue with the browser's normal image fallback.
+        }
+      }),
+    );
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
     window.print();
   }
 
@@ -1038,7 +1054,7 @@ export default function Home() {
                                 projectedFyTotal,
                                 index,
                               ) !== null && (
-                                <span className="mt-0.5 block text-[10px]">
+                                <span className="milestone-shortfall mt-0.5 block whitespace-nowrap text-[8px] leading-none">
                                   {currency(
                                     milestoneShortfall(
                                       value,

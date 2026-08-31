@@ -92,6 +92,17 @@ select {
 #print-root {
   display: none;
 }
+@media screen {
+  body[data-print-view] > #print-root {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: -200vw;
+    width: 10.5in;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
 .splash-title {
   font-size: clamp(1.5rem, 4vw, 4rem);
   font-weight: 700;
@@ -161,6 +172,11 @@ select {
   }
   body[data-print-view] #print-root [data-print-surface] p {
     font-size: 10px;
+  }
+  body[data-print-view] #print-root .milestone-shortfall {
+    white-space: nowrap !important;
+    font-size: 6px !important;
+    line-height: 1 !important;
   }
   body[data-print-view] .print-report-header {
     position: relative;

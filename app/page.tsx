@@ -167,6 +167,9 @@ export default function Home() {
   const [scheduleGroupBy, setScheduleGroupBy] = useState<'sag' | 'dirDas'>(
     'dirDas',
   );
+  const [scheduleDashboardGroupBy, setScheduleDashboardGroupBy] = useState<
+    'sag' | 'dirDas' | 'objectClass' | 'functionalArea'
+  >('sag');
   const [scheduleFundingType, setScheduleFundingType] = useState<'COM' | 'OBL'>(
     'COM',
   );
@@ -609,6 +612,35 @@ export default function Home() {
     (sum, value) => sum + value,
     0,
   );
+  const scheduleDashboardRows = useMemo(() => {
+    const grouped = new Map<string, { projected: number; annualRequirement: number }>();
+    results
+      .filter((row) => keyText(row.comObl) === scheduleFundingType)
+      .forEach((row) => {
+        const group = row[scheduleDashboardGroupBy] || 'Unspecified';
+        const current = grouped.get(group) ?? { projected: 0, annualRequirement: 0 };
+        scheduleMonthIndexes.forEach((monthIndex) => {
+          const prior = monthIndex === 0 ? 0 : row.months[monthIndex - 1] ?? 0;
+          current.projected += (row.months[monthIndex] ?? 0) - prior;
+        });
+        current.annualRequirement += row.months[months.length - 1] ?? 0;
+        grouped.set(group, current);
+      });
+    return [...grouped.entries()]
+      .map(([group, values]) => ({
+        group,
+        ...values,
+        percentOfAnnual:
+          values.annualRequirement === 0 ? 0 : values.projected / values.annualRequirement,
+      }))
+      .sort((a, b) => compareText(a.group, b.group, 'asc'));
+  }, [results, scheduleFundingType, scheduleDashboardGroupBy, scheduleMonthIndexes]);
+  const scheduleAnnualRequirement = scheduleDashboardRows.reduce(
+    (sum, row) => sum + row.annualRequirement,
+    0,
+  );
+  const schedulePercentOfAnnual =
+    scheduleAnnualRequirement === 0 ? 0 : scheduleGrandTotal / scheduleAnnualRequirement;
   const projectedTotals = useMemo(
     () =>
       months.map((_, index) =>
@@ -1357,6 +1389,81 @@ export default function Home() {
                   change in the cumulative Spend Plan balance for each month.
                 </p>
               </div>
+              <div className="border-b bg-muted/20 p-5">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3 print:hidden">
+                  <div>
+                    <h4 className="font-semibold">Funding schedule dashboard</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Selected-period projected receipts compared with the annual requirement.
+                    </p>
+                  </div>
+                  <label className="grid gap-1 text-sm font-medium">
+                    Dashboard breakdown
+                    <select
+                      value={scheduleDashboardGroupBy}
+                      onChange={(event) =>
+                        setScheduleDashboardGroupBy(
+                          event.target.value as
+                            | 'sag'
+                            | 'dirDas'
+                            | 'objectClass'
+                            | 'functionalArea',
+                        )
+                      }
+                      className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="sag">SAG</option>
+                      <option value="dirDas">DIR/DASA</option>
+                      <option value="objectClass">Object Class</option>
+                      <option value="functionalArea">Functional Area</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border bg-card p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Projected to receive</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums">{currency(scheduleGrandTotal)}</p>
+                  </div>
+                  <div className="rounded-xl border bg-card p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Annual requirement</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums">{currency(scheduleAnnualRequirement)}</p>
+                  </div>
+                  <div className="rounded-xl border bg-card p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Percent of annual requirement</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums">{percent(schedulePercentOfAnnual)}</p>
+                  </div>
+                </div>
+                <div className="mt-4 overflow-x-auto rounded-xl border bg-card">
+                  <table className="w-full min-w-[620px] text-sm">
+                    <thead className="bg-[#142541] text-white">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">
+                          {scheduleDashboardGroupBy === 'dirDas'
+                            ? 'DIR/DASA'
+                            : scheduleDashboardGroupBy === 'objectClass'
+                              ? 'Object Class'
+                              : scheduleDashboardGroupBy === 'functionalArea'
+                                ? 'Functional Area'
+                                : 'SAG'}
+                        </th>
+                        <th className="px-3 py-2 text-center font-semibold">Projected to receive</th>
+                        <th className="px-3 py-2 text-center font-semibold">Annual requirement</th>
+                        <th className="px-3 py-2 text-center font-semibold">Percent of annual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scheduleDashboardRows.map((row) => (
+                        <tr key={row.group} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-medium">{row.group}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-center tabular-nums">{currency(row.projected)}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-center tabular-nums">{currency(row.annualRequirement)}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-center font-semibold tabular-nums">{percent(row.percentOfAnnual)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[700px] text-sm">
                   <thead className="bg-primary text-primary-foreground">
@@ -1384,12 +1491,12 @@ export default function Home() {
                         {row.values.map((value, index) => (
                           <td
                             key={scheduleMonthIndexes[index]}
-                            className="whitespace-nowrap px-3 py-3 text-right tabular-nums"
+                            className="whitespace-nowrap px-3 py-3 text-center tabular-nums"
                           >
                             {currency(value)}
                           </td>
                         ))}
-                        <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums">
+                        <td className="whitespace-nowrap px-3 py-3 text-center font-semibold tabular-nums">
                           {currency(row.total)}
                         </td>
                       </tr>
@@ -1399,12 +1506,12 @@ export default function Home() {
                       {scheduleTotals.map((value, index) => (
                         <td
                           key={scheduleMonthIndexes[index]}
-                          className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums"
+                          className="whitespace-nowrap px-3 py-3 text-center font-semibold tabular-nums"
                         >
                           {currency(value)}
                         </td>
                       ))}
-                      <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums">
+                      <td className="whitespace-nowrap px-3 py-3 text-center font-semibold tabular-nums">
                         {currency(scheduleGrandTotal)}
                       </td>
                     </tr>

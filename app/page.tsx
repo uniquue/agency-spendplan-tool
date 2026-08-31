@@ -1320,6 +1320,11 @@ export default function Home() {
                             variant={
                               row.status === 'Matched' ? 'default' : 'secondary'
                             }
+                            title={
+                              row.status === 'Multiple matches'
+                                ? '“Multiple matches” means the Functional Area matched more than one DIR/DASA in the APE lookup.'
+                                : undefined
+                            }
                           >
                             {row.status}
                           </Badge>

@@ -1153,7 +1153,7 @@ export default function Home() {
                 </p>
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-[1650px] w-full text-sm">
+                <table className="min-w-[1550px] w-full text-sm">
                   <thead className="bg-primary text-left text-primary-foreground">
                     <tr>
                       {[
@@ -1162,7 +1162,6 @@ export default function Home() {
                         'COM/OBL',
                         'SAG',
                         ...months,
-                        `${fiscalYear} Total (SEP)`,
                       ].map((header) => (
                         <th
                           key={header}
@@ -1198,9 +1197,6 @@ export default function Home() {
                             {currency(value)}
                           </td>
                         ))}
-                        <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                          {currency(row.total)}
-                        </td>
                       </tr>
                     ))}
                     <tr className="bg-[#142541] text-white">
@@ -1215,9 +1211,6 @@ export default function Home() {
                           {currency(value)}
                         </td>
                       ))}
-                      <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                        {currency(sagFyTotal)}
-                      </td>
                     </tr>
                     <tr className="bg-[#20395e] text-white">
                       <td colSpan={4} className="px-3 py-3 font-semibold">
@@ -1248,9 +1241,6 @@ export default function Home() {
                           )}
                         </td>
                       ))}
-                      <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                        100%
-                      </td>
                     </tr>
                   </tbody>
                 </table>

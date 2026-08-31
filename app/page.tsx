@@ -134,6 +134,12 @@ export default function Home() {
   const [projectedDirSort, setProjectedDirSort] = useState<'asc' | 'desc'>(
     'asc',
   );
+  const [consolidatedSortField, setConsolidatedSortField] = useState<
+    'dirDas' | 'objectClass'
+  >('dirDas');
+  const [consolidatedSortDirection, setConsolidatedSortDirection] = useState<
+    'asc' | 'desc'
+  >('asc');
   const [dashboardDirDas, setDashboardDirDas] = useState('ALL');
   const [dashboardObjectClass, setDashboardObjectClass] = useState('ALL');
   const [dashboardFundingType, setDashboardFundingType] = useState<
@@ -299,6 +305,22 @@ export default function Home() {
   const filteredResults = useMemo(
     () => results.filter((row) => keyText(row.comObl) === selectedComObl),
     [results, selectedComObl],
+  );
+  const sortedFilteredResults = useMemo(
+    () =>
+      [...filteredResults].sort((a, b) => {
+        const primary = a[consolidatedSortField].localeCompare(
+          b[consolidatedSortField],
+          undefined,
+          { numeric: true },
+        );
+        const secondary = a.dirDas.localeCompare(b.dirDas, undefined, {
+          numeric: true,
+        });
+        const order = primary || secondary;
+        return consolidatedSortDirection === 'asc' ? order : -order;
+      }),
+    [filteredResults, consolidatedSortField, consolidatedSortDirection],
   );
   const sagOptions = useMemo(
     () =>
@@ -925,11 +947,38 @@ export default function Home() {
               </div>
             )}
             {activeView === 'consolidated' && (
-              <div className="mt-5 flex items-end justify-between gap-3 rounded-xl border bg-card p-4 print:hidden">
-                <FundingTypeButtons
-                  value={selectedComObl}
-                  onChange={setSelectedComObl}
-                />
+              <div className="mt-5 flex flex-wrap items-end justify-between gap-3 rounded-xl border bg-card p-4 print:hidden">
+                <div className="flex flex-wrap items-end gap-3">
+                  <FundingTypeButtons
+                    value={selectedComObl}
+                    onChange={setSelectedComObl}
+                  />
+                  <label className="grid gap-1 text-sm font-medium">
+                    Sort by
+                    <select
+                      value={consolidatedSortField}
+                      onChange={(event) =>
+                        setConsolidatedSortField(
+                          event.target.value as 'dirDas' | 'objectClass',
+                        )
+                      }
+                      className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="dirDas">DIR/DASA</option>
+                      <option value="objectClass">Object Class</option>
+                    </select>
+                  </label>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setConsolidatedSortDirection((current) =>
+                        current === 'asc' ? 'desc' : 'asc',
+                      )
+                    }
+                  >
+                    {consolidatedSortDirection === 'asc' ? 'A–Z' : 'Z–A'}
+                  </Button>
+                </div>
                 <Button
                   variant="outline"
                   onClick={() => printCard('consolidated')}
@@ -1248,7 +1297,7 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredResults.map((row) => (
+                    {sortedFilteredResults.map((row) => (
                       <tr
                         key={[
                           row.objectClass,

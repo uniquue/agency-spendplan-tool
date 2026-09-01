@@ -111,11 +111,55 @@ function percent(value: number) {
     maximumFractionDigits: 1,
   }).format(value);
 }
-function readRows(file: File) {
+function readRows(file: File, expectedColumns: string[]) {
   return file.arrayBuffer().then((buffer) => {
     const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    return XLSX.utils.sheet_to_json<Row>(sheet, { defval: '' });
+    let bestRows: Row[] = [];
+    let bestScore = -1;
+
+    workbook.SheetNames.forEach((sheetName) => {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) return;
+
+      // Some Army-managed Excel builds leave the worksheet's !ref range at its
+      // old size after rows are appended. Rebuild the range from the cells that
+      // are actually present so newly added records are not silently ignored.
+      const cellAddresses = Object.keys(sheet).filter(
+        (address) => !address.startsWith('!'),
+      );
+      if (cellAddresses.length) {
+        const decoded = cellAddresses.map((address) => XLSX.utils.decode_cell(address));
+        const range = decoded.reduce(
+          (current, cell) => ({
+            s: {
+              r: Math.min(current.s.r, cell.r),
+              c: Math.min(current.s.c, cell.c),
+            },
+            e: {
+              r: Math.max(current.e.r, cell.r),
+              c: Math.max(current.e.c, cell.c),
+            },
+          }),
+          { s: { r: Infinity, c: Infinity }, e: { r: 0, c: 0 } },
+        );
+        sheet['!ref'] = XLSX.utils.encode_range(range);
+      }
+
+      const rows = XLSX.utils.sheet_to_json<Row>(sheet, {
+        defval: '',
+        blankrows: false,
+      });
+      const present = new Set(Object.keys(rows[0] ?? {}).map(keyText));
+      const score = expectedColumns.filter((column) =>
+        present.has(keyText(column)),
+      ).length;
+      if (score > bestScore || (score === bestScore && rows.length > bestRows.length)) {
+        bestRows = rows;
+        bestScore = score;
+      }
+    });
+
+    return bestRows;
   });
 }
 function missingColumns(rows: Row[], expected: string[]) {
@@ -197,7 +241,7 @@ export default function Home() {
   async function loadSpend(file?: File) {
     if (!file) return;
     try {
-      const rows = await readRows(file);
+      const rows = await readRows(file, spendRequired);
       const missing = missingColumns(rows, spendRequired);
       if (missing.length)
         throw new Error(`Spend plan is missing: ${missing.join(', ')}`);
@@ -217,7 +261,7 @@ export default function Home() {
   async function loadApe(file?: File) {
     if (!file) return;
     try {
-      const rows = await readRows(file);
+      const rows = await readRows(file, apeRequired);
       const missing = missingColumns(rows, apeRequired);
       if (missing.length)
         throw new Error(`APE reference is missing: ${missing.join(', ')}`);
@@ -758,14 +802,22 @@ export default function Home() {
           className="sr-only"
           type="file"
           accept=".xlsx,.xls"
-          onChange={(event) => loadSpend(event.target.files?.[0])}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = '';
+            void loadSpend(file);
+          }}
         />
         <input
           ref={apeInput}
           className="sr-only"
           type="file"
           accept=".xlsx,.xls"
-          onChange={(event) => loadApe(event.target.files?.[0])}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = '';
+            void loadApe(file);
+          }}
         />
         {error && (
           <div

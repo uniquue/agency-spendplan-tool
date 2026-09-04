@@ -2022,7 +2022,7 @@ export default function Home() {
                                 projectedFyTotal,
                                 index,
                               ) !== null && (
-                                <span className="milestone-shortfall mt-0.5 block whitespace-nowrap text-[8px] leading-none">
+                                <span className="milestone-shortfall mt-0.5 block whitespace-nowrap leading-none">
                                   {currency(
                                     milestoneShortfall(
                                       value,

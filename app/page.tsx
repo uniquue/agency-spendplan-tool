@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -50,12 +50,19 @@ type DashboardRow = {
   comObl: string;
   months: number[];
 };
+type RollupRow = {
+  dirDas: string;
+  sag: string;
+  months: number[];
+  total: number;
+};
 type DashboardView =
   | 'dashboard'
   | 'projected'
   | 'sag'
   | 'consolidated'
-  | 'schedule';
+  | 'schedule'
+  | 'rollup';
 const months = [
   'OCT',
   'NOV',
@@ -225,6 +232,15 @@ export default function Home() {
   const [scheduleHalf, setScheduleHalf] = useState(0);
   const [scheduleStartMonth, setScheduleStartMonth] = useState(0);
   const [scheduleMonthCount, setScheduleMonthCount] = useState(3);
+  const [rollupFundingType, setRollupFundingType] = useState<'COM' | 'OBL'>(
+    'OBL',
+  );
+  const [rollupSortField, setRollupSortField] = useState<'dirDas' | 'sag'>(
+    'dirDas',
+  );
+  const [rollupSortDirection, setRollupSortDirection] = useState<
+    'asc' | 'desc'
+  >('asc');
   const [dashboardDirDas, setDashboardDirDas] = useState('ALL');
   const [dashboardObjectClass, setDashboardObjectClass] = useState('ALL');
   const [dashboardFundingType, setDashboardFundingType] = useState<
@@ -365,7 +381,7 @@ export default function Home() {
             ? 'Multiple matches'
             : 'Unmatched';
       const dirDas = dirs.length ? dirs.join(' / ') : 'No DIR/DASA match';
-      const groupKey = [objectClass, comObl, functionalArea, dirDas].join('|');
+      const groupKey = [objectClass, comObl, sag, functionalArea, dirDas].join('|');
       const monthly = months.map((month) => amount(field(row, month)));
       const existing = map.get(groupKey) ?? {
         objectClass,
@@ -685,6 +701,81 @@ export default function Home() {
   );
   const schedulePercentOfAnnual =
     scheduleAnnualRequirement === 0 ? 0 : scheduleGrandTotal / scheduleAnnualRequirement;
+  const rollupRows = useMemo<RollupRow[]>(() => {
+    const grouped = new Map<string, RollupRow>();
+    results
+      .filter((row) => keyText(row.comObl) === rollupFundingType)
+      .forEach((row) => {
+        const groupKey = `${row.dirDas}|${row.sag}`;
+        const current = grouped.get(groupKey) ?? {
+          dirDas: row.dirDas,
+          sag: row.sag,
+          months: Array(months.length).fill(0),
+          total: 0,
+        };
+        current.months = current.months.map(
+          (value, index) => value + (row.months[index] ?? 0),
+        );
+        current.total = current.months[current.months.length - 1] ?? 0;
+        grouped.set(groupKey, current);
+      });
+    return [...grouped.values()].sort((a, b) => {
+      const primary = compareText(
+        a[rollupSortField],
+        b[rollupSortField],
+        rollupSortDirection,
+      );
+      return primary || compareText(a.dirDas, b.dirDas, rollupSortDirection);
+    });
+  }, [results, rollupFundingType, rollupSortField, rollupSortDirection]);
+  const rollupSections = useMemo(() => {
+    const grouped = new Map<string, RollupRow[]>();
+    rollupRows.forEach((row) => {
+      const current = grouped.get(row.dirDas) ?? [];
+      current.push(row);
+      grouped.set(row.dirDas, current);
+    });
+    return [...grouped.entries()]
+      .map(([dirDas, rows]) => ({
+        dirDas,
+        rows: [...rows].sort((a, b) =>
+          compareText(a.sag, b.sag, rollupSortDirection),
+        ),
+        months: months.map((_, index) =>
+          rows.reduce((sum, row) => sum + row.months[index], 0),
+        ),
+        total: rows.reduce((sum, row) => sum + row.total, 0),
+      }))
+      .sort((a, b) => compareText(a.dirDas, b.dirDas, rollupSortDirection));
+  }, [rollupRows, rollupSortDirection]);
+  const rollupAgencyBySag = useMemo(() => {
+    const grouped = new Map<string, RollupRow>();
+    rollupRows.forEach((row) => {
+      const current = grouped.get(row.sag) ?? {
+        dirDas: 'Agency',
+        sag: row.sag,
+        months: Array(months.length).fill(0),
+        total: 0,
+      };
+      current.months = current.months.map(
+        (value, index) => value + row.months[index],
+      );
+      current.total = current.months[current.months.length - 1] ?? 0;
+      grouped.set(row.sag, current);
+    });
+    return [...grouped.values()].sort((a, b) =>
+      compareText(a.sag, b.sag, rollupSortDirection),
+    );
+  }, [rollupRows, rollupSortDirection]);
+  const rollupAgencyMonths = useMemo(
+    () =>
+      months.map((_, index) =>
+        rollupRows.reduce((sum, row) => sum + row.months[index], 0),
+      ),
+    [rollupRows],
+  );
+  const rollupAgencyTotal =
+    rollupAgencyMonths[rollupAgencyMonths.length - 1] ?? 0;
   const projectedTotals = useMemo(
     () =>
       months.map((_, index) =>
@@ -721,6 +812,17 @@ export default function Home() {
     return total > 0 && (values[index] ?? 0) / total >= target
       ? 'bg-emerald-500/25 text-emerald-50'
       : 'bg-red-500/30 text-red-50';
+  };
+  const rollupPercentageTone = (
+    values: number[],
+    total: number,
+    index: number,
+  ) => {
+    const target = milestoneTarget(index);
+    if (target === null) return 'text-muted-foreground';
+    return total > 0 && (values[index] ?? 0) / total >= target
+      ? 'bg-emerald-100 text-emerald-900'
+      : 'bg-red-100 text-red-900';
   };
   const milestoneShortfall = (
     value: number,
@@ -871,6 +973,7 @@ export default function Home() {
                   ['sag', 'View SAG'],
                   ['consolidated', 'Consolidated plan'],
                   ['schedule', 'Funding schedule'],
+                  ['rollup', 'G-8 budget roll-up'],
                 ] as const
               ).map(([view, label]) => (
                 <Button
@@ -1571,6 +1674,238 @@ export default function Home() {
                 </table>
               </div>
             </section>
+            {activeView === 'rollup' && (
+              <div className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 print:hidden">
+                <FundingTypeButtons
+                  value={rollupFundingType}
+                  onChange={setRollupFundingType}
+                />
+                <label className="grid gap-1 text-sm font-medium">
+                  Sort by
+                  <select
+                    value={rollupSortField}
+                    onChange={(event) =>
+                      setRollupSortField(
+                        event.target.value as 'dirDas' | 'sag',
+                      )
+                    }
+                    className="h-10 min-w-40 rounded-md border bg-[#eef6ff] px-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="dirDas">DIR/DASA</option>
+                    <option value="sag">SAG</option>
+                  </select>
+                </label>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setRollupSortDirection((current) =>
+                      current === 'asc' ? 'desc' : 'asc',
+                    )
+                  }
+                >
+                  {rollupSortDirection === 'asc' ? 'A–Z' : 'Z–A'}
+                </Button>
+                <Button
+                  className="ml-auto"
+                  variant="outline"
+                  onClick={() => printCard('rollup')}
+                >
+                  <Printer /> Print G-8 roll-up
+                </Button>
+              </div>
+            )}
+            <section
+              data-print-surface="rollup"
+              className={`${activeView === 'rollup' ? 'block' : 'hidden'} mt-6 overflow-hidden rounded-2xl border bg-card shadow-sm`}
+            >
+              <div className="print-report-header border-b p-5">
+                <img
+                  className="print-report-logo"
+                  src="/esd-logo.png"
+                  alt="Executive Services Directorate logo"
+                />
+                <h3 className="font-semibold">
+                  {fiscalYear} G-8 Budget Roll-Up — {rollupFundingType}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Cumulative monthly execution by DIR/DASA and SAG. Percentages
+                  compare each month with the September annual requirement.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[2200px] text-xs">
+                  <thead className="bg-primary text-primary-foreground">
+                    <tr>
+                      <th
+                        rowSpan={2}
+                        className="border-b border-white/10 px-3 py-3 text-left font-semibold"
+                      >
+                        DIR/DASA
+                      </th>
+                      <th
+                        rowSpan={2}
+                        className="border-b border-white/10 px-3 py-3 text-center font-semibold"
+                      >
+                        SAG
+                      </th>
+                      {months.map((month) => (
+                        <th
+                          key={month}
+                          colSpan={2}
+                          className="border-b border-l border-white/10 px-2 py-2 text-center font-semibold"
+                        >
+                          {month}
+                        </th>
+                      ))}
+                      <th
+                        rowSpan={2}
+                        className="border-b border-l border-white/10 px-3 py-3 text-center font-semibold"
+                      >
+                        Annual requirement
+                      </th>
+                    </tr>
+                    <tr>
+                      {months.flatMap((month) => [
+                        <th
+                          key={`${month}-amount`}
+                          className="border-b border-l border-white/10 px-2 py-2 text-center font-semibold"
+                        >
+                          Amount
+                        </th>,
+                        <th
+                          key={`${month}-percent`}
+                          className="border-b border-white/10 px-2 py-2 text-center font-semibold"
+                        >
+                          %
+                        </th>,
+                      ])}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rollupSections.map((section) => (
+                      <Fragment key={section.dirDas}>
+                        <tr className="bg-muted/40">
+                          <td
+                            colSpan={27}
+                            className="px-3 py-2 font-semibold text-foreground"
+                          >
+                            {section.dirDas} Funding Roll-Up
+                          </td>
+                        </tr>
+                        {section.rows.map((row) => (
+                          <tr
+                            key={`${row.dirDas}-${row.sag}`}
+                            className="border-b last:border-0"
+                          >
+                            <td className="px-3 py-2 font-medium">{row.dirDas}</td>
+                            <td className="px-3 py-2 text-center">{row.sag}</td>
+                            {row.months.flatMap((value, index) => {
+                              const rowPercent = row.total > 0 ? value / row.total : 0;
+                              const shortfall = milestoneShortfall(value, row.total, index);
+                              return [
+                                <td
+                                  key={`${index}-amount`}
+                                  className="whitespace-nowrap border-l px-2 py-2 text-center tabular-nums"
+                                >
+                                  {currency(value)}
+                                </td>,
+                                <td
+                                  key={`${index}-percent`}
+                                  className={`whitespace-nowrap px-2 py-2 text-center tabular-nums ${rollupPercentageTone(row.months, row.total, index)}`}
+                                >
+                                  <span className="font-semibold">{percent(rowPercent)}</span>
+                                  {shortfall !== null && (
+                                    <span className="block whitespace-nowrap text-[9px] font-medium">
+                                      {currency(shortfall)}
+                                    </span>
+                                  )}
+                                </td>,
+                              ];
+                            })}
+                            <td className="whitespace-nowrap border-l px-3 py-2 text-center font-semibold tabular-nums">
+                              {currency(row.total)}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="bg-[#e7f4ea] font-semibold">
+                          <td className="px-3 py-2">{section.dirDas} total</td>
+                          <td className="px-3 py-2 text-center">All SAGs</td>
+                          {section.months.flatMap((value, index) => [
+                            <td
+                              key={`${index}-section-amount`}
+                              className="whitespace-nowrap border-l px-2 py-2 text-center tabular-nums"
+                            >
+                              {currency(value)}
+                            </td>,
+                            <td
+                              key={`${index}-section-percent`}
+                              className={`whitespace-nowrap px-2 py-2 text-center tabular-nums ${rollupPercentageTone(section.months, section.total, index)}`}
+                            >
+                              {percent(section.total > 0 ? value / section.total : 0)}
+                            </td>,
+                          ])}
+                          <td className="whitespace-nowrap border-l px-3 py-2 text-center tabular-nums">
+                            {currency(section.total)}
+                          </td>
+                        </tr>
+                      </Fragment>
+                    ))}
+                    <tr className="bg-[#142541] text-white">
+                      <td
+                        colSpan={27}
+                        className="px-3 py-2 font-semibold"
+                      >
+                        G-8 Total(s) by SAG
+                      </td>
+                    </tr>
+                    {rollupAgencyBySag.map((row) => (
+                      <tr key={`agency-${row.sag}`} className="border-b">
+                        <td className="px-3 py-2 font-medium">Agency</td>
+                        <td className="px-3 py-2 text-center">{row.sag}</td>
+                        {row.months.flatMap((value, index) => [
+                          <td
+                            key={`${index}-agency-sag-amount`}
+                            className="whitespace-nowrap border-l px-2 py-2 text-center tabular-nums"
+                          >
+                            {currency(value)}
+                          </td>,
+                          <td
+                            key={`${index}-agency-sag-percent`}
+                            className={`whitespace-nowrap px-2 py-2 text-center tabular-nums ${rollupPercentageTone(row.months, row.total, index)}`}
+                          >
+                            {percent(row.total > 0 ? value / row.total : 0)}
+                          </td>,
+                        ])}
+                        <td className="whitespace-nowrap border-l px-3 py-2 text-center font-semibold tabular-nums">
+                          {currency(row.total)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-[#142541] text-white">
+                      <td className="px-3 py-3 font-semibold">Agency total</td>
+                      <td className="px-3 py-3 text-center font-semibold">All SAGs</td>
+                      {rollupAgencyMonths.flatMap((value, index) => [
+                        <td
+                          key={`${index}-grand-amount`}
+                          className="whitespace-nowrap border-l border-white/10 px-2 py-3 text-center font-semibold tabular-nums"
+                        >
+                          {currency(value)}
+                        </td>,
+                        <td
+                          key={`${index}-grand-percent`}
+                          className={`whitespace-nowrap px-2 py-3 text-center font-semibold tabular-nums ${percentageTone(rollupAgencyMonths, rollupAgencyTotal, index)}`}
+                        >
+                          {percent(rollupAgencyTotal > 0 ? value / rollupAgencyTotal : 0)}
+                        </td>,
+                      ])}
+                      <td className="whitespace-nowrap border-l border-white/10 px-3 py-3 text-center font-semibold tabular-nums">
+                        {currency(rollupAgencyTotal)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
             <section
               data-print-surface="projected"
               className={`${activeView === 'projected' ? 'block' : 'hidden'} mt-6 overflow-hidden rounded-2xl border bg-card shadow-sm`}
@@ -1876,6 +2211,7 @@ export default function Home() {
                         key={[
                           row.objectClass,
                           row.comObl,
+                          row.sag,
                           row.functionalArea,
                           row.dirDas,
                         ].join('|')}

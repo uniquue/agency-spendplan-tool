@@ -59,6 +59,15 @@ select {
   background-color: #f3efe5 !important;
 }
 
+[data-print-surface='rollup'] table {
+  border-collapse: collapse;
+}
+
+[data-print-surface='rollup'] th,
+[data-print-surface='rollup'] td {
+  border: 1px solid #000 !important;
+}
+
 .splash-screen {
   position: fixed;
   inset: 0;

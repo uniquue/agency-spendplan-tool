@@ -11,6 +11,11 @@ import {
   X,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import {
+  DEFAULT_APE_ROWS,
+  DEFAULT_ASA_SPEND_ROWS,
+  DEFAULT_G8_CAA_SPEND_ROWS,
+} from './defaultData';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -175,12 +180,16 @@ function missingColumns(rows: Row[], expected: string[]) {
 }
 
 export default function Home() {
-  const spendInput = useRef<HTMLInputElement>(null);
+  const g8CaaSpendInput = useRef<HTMLInputElement>(null);
+  const asaSpendInput = useRef<HTMLInputElement>(null);
   const apeInput = useRef<HTMLInputElement>(null);
-  const [spendRows, setSpendRows] = useState<Row[]>([]);
-  const [apeRows, setApeRows] = useState<Row[]>([]);
-  const [spendName, setSpendName] = useState('');
-  const [apeName, setApeName] = useState('');
+  const [g8CaaSpendRows, setG8CaaSpendRows] = useState<Row[]>(DEFAULT_G8_CAA_SPEND_ROWS);
+  const [asaSpendRows, setAsaSpendRows] = useState<Row[]>(DEFAULT_ASA_SPEND_ROWS);
+  const [apeRows, setApeRows] = useState<Row[]>(DEFAULT_APE_ROWS);
+  const [g8CaaSpendName, setG8CaaSpendName] = useState('A22DE-A22BC FY27 SpendPlan.xlsx');
+  const [asaSpendName, setAsaSpendName] = useState('A22DD FY27 SpendPlan.xlsx');
+  const [apeName, setApeName] = useState('APE.xlsx');
+  const [organization, setOrganization] = useState<'ALL' | 'G8CAA' | 'ASA'>('ALL');
   const [error, setError] = useState('');
   const [selectedComObl, setSelectedComObl] = useState<'COM' | 'OBL'>('COM');
   const [selectedSagComObl, setSelectedSagComObl] = useState<'COM' | 'OBL'>(
@@ -254,19 +263,76 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  async function loadSpend(file?: File) {
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('esd-spendplan-data-v1');
+      if (!saved) return;
+      const data = JSON.parse(saved) as {
+        g8CaaRows?: Row[];
+        asaRows?: Row[];
+        apeRows?: Row[];
+        g8CaaName?: string;
+        asaName?: string;
+        apeName?: string;
+      };
+      if (Array.isArray(data.g8CaaRows) && data.g8CaaRows.length) setG8CaaSpendRows(data.g8CaaRows);
+      if (Array.isArray(data.asaRows) && data.asaRows.length) setAsaSpendRows(data.asaRows);
+      if (Array.isArray(data.apeRows) && data.apeRows.length) setApeRows(data.apeRows);
+      if (data.g8CaaName) setG8CaaSpendName(data.g8CaaName);
+      if (data.asaName) setAsaSpendName(data.asaName);
+      if (data.apeName) setApeName(data.apeName);
+    } catch {
+      window.localStorage.removeItem('esd-spendplan-data-v1');
+    }
+  }, []);
+
+  const spendRows = useMemo(
+    () =>
+      organization === 'G8CAA'
+        ? g8CaaSpendRows
+        : organization === 'ASA'
+          ? asaSpendRows
+          : [...g8CaaSpendRows, ...asaSpendRows],
+    [organization, g8CaaSpendRows, asaSpendRows],
+  );
+
+  function retainData(next: {
+    g8CaaRows?: Row[];
+    asaRows?: Row[];
+    apeRows?: Row[];
+    g8CaaName?: string;
+    asaName?: string;
+    apeName?: string;
+  }) {
+    const payload = {
+      g8CaaRows: next.g8CaaRows ?? g8CaaSpendRows,
+      asaRows: next.asaRows ?? asaSpendRows,
+      apeRows: next.apeRows ?? apeRows,
+      g8CaaName: next.g8CaaName ?? g8CaaSpendName,
+      asaName: next.asaName ?? asaSpendName,
+      apeName: next.apeName ?? apeName,
+    };
+    window.localStorage.setItem('esd-spendplan-data-v1', JSON.stringify(payload));
+  }
+
+  async function loadSpend(file: File | undefined, target: 'G8CAA' | 'ASA') {
     if (!file) return;
     try {
       const rows = await readRows(file, spendRequired);
       const missing = missingColumns(rows, spendRequired);
       if (missing.length)
         throw new Error(`Spend plan is missing: ${missing.join(', ')}`);
-      setSpendRows(rows);
-      setSpendName(file.name);
+      if (target === 'G8CAA') {
+        setG8CaaSpendRows(rows);
+        setG8CaaSpendName(file.name);
+        retainData({ g8CaaRows: rows, g8CaaName: file.name });
+      } else {
+        setAsaSpendRows(rows);
+        setAsaSpendName(file.name);
+        retainData({ asaRows: rows, asaName: file.name });
+      }
       setError('');
     } catch (cause) {
-      setSpendRows([]);
-      setSpendName('');
       setError(
         cause instanceof Error
           ? cause.message
@@ -283,10 +349,9 @@ export default function Home() {
         throw new Error(`APE reference is missing: ${missing.join(', ')}`);
       setApeRows(rows);
       setApeName(file.name);
+      retainData({ apeRows: rows, apeName: file.name });
       setError('');
     } catch (cause) {
-      setApeRows([]);
-      setApeName('');
       setError(
         cause instanceof Error
           ? cause.message
@@ -884,21 +949,43 @@ export default function Home() {
             Turn a spend plan into an agency view.
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Upload the spend plan and the APE lookup. The tool consolidates
+            The FY27 G-8/CAA and ASA(FM&amp;C) spend plans and the APE lookup are loaded automatically. Upload a replacement whenever one of the source workbooks changes. The tool retains each replacement on this computer and consolidates
             Object Class, COM/OBL, Functional Area, DIR/DASA, and every month in
             your browser.
           </p>
         </div>
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="mb-5 max-w-sm">
+          <label htmlFor="organization-view" className="mb-2 block text-sm font-semibold">
+            Organization view
+          </label>
+          <select
+            id="organization-view"
+            value={organization}
+            onChange={(event) => setOrganization(event.target.value as 'ALL' | 'G8CAA' | 'ASA')}
+            className="w-full rounded-lg border bg-card px-3 py-2 text-sm"
+          >
+            <option value="ALL">All organizations</option>
+            <option value="G8CAA">G-8 / CAA (A22DE and A22BC)</option>
+            <option value="ASA">ASA(FM&amp;C) (A22DD)</option>
+          </select>
+        </div>
+        <div className="grid gap-5 lg:grid-cols-3">
           <UploadCard
-            title="1. Upload Spend Plan"
-            description="Spend plan workbook"
-            name={spendName}
-            ready={!!spendRows.length}
-            onClick={() => spendInput.current?.click()}
+            title="1. Update G-8 / CAA Spend Plan"
+            description="A22DE and A22BC workbook"
+            name={g8CaaSpendName}
+            ready={!!g8CaaSpendRows.length}
+            onClick={() => g8CaaSpendInput.current?.click()}
           />
           <UploadCard
-            title="2. Upload APE Lookup"
+            title="2. Update ASA(FM&C) Spend Plan"
+            description="A22DD workbook"
+            name={asaSpendName}
+            ready={!!asaSpendRows.length}
+            onClick={() => asaSpendInput.current?.click()}
+          />
+          <UploadCard
+            title="3. Update APE Lookup"
             description="APE-to-DIR/DASA reference workbook"
             name={apeName}
             ready={!!apeRows.length}
@@ -906,14 +993,25 @@ export default function Home() {
           />
         </div>
         <input
-          ref={spendInput}
+          ref={g8CaaSpendInput}
           className="sr-only"
           type="file"
           accept=".xlsx,.xls"
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = '';
-            void loadSpend(file);
+            void loadSpend(file, 'G8CAA');
+          }}
+        />
+        <input
+          ref={asaSpendInput}
+          className="sr-only"
+          type="file"
+          accept=".xlsx,.xls"
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = '';
+            void loadSpend(file, 'ASA');
           }}
         />
         <input
@@ -2302,14 +2400,17 @@ export default function Home() {
               variant="outline"
               className="mt-5"
               onClick={() => {
-                setSpendRows([]);
-                setApeRows([]);
-                setSpendName('');
-                setApeName('');
+                setG8CaaSpendRows(DEFAULT_G8_CAA_SPEND_ROWS);
+                setAsaSpendRows(DEFAULT_ASA_SPEND_ROWS);
+                setApeRows(DEFAULT_APE_ROWS);
+                setG8CaaSpendName('A22DE-A22BC FY27 SpendPlan.xlsx');
+                setAsaSpendName('A22DD FY27 SpendPlan.xlsx');
+                setApeName('APE.xlsx');
+                window.localStorage.removeItem('esd-spendplan-data-v1');
                 setError('');
               }}
             >
-              <X /> Start over
+              <X /> Restore hard-coded FY27 files
             </Button>
           </>
         )}
@@ -2408,4 +2509,3 @@ function Stat({
     </div>
   );
 }
-

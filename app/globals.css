@@ -221,3 +221,5 @@ select {
   }
 }
 
+
+.esd-home-link {position:fixed;right:1.125rem;bottom:1.125rem;z-index:9999;border:2px solid #d8bd63;border-radius:9999px;background:#12271d;color:white;padding:.625rem .9375rem;font-weight:800;text-decoration:none;box-shadow:0 4px 16px rgb(0 0 0 / 35%)}.esd-home-link:hover,.esd-home-link:focus{background:#245e47}@media print{.esd-home-link{display:none!important}}

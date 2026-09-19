@@ -837,6 +837,12 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
+      <a
+        className="esd-home-link"
+        href="https://yellow-mushroom-04e4ab810.2.azurestaticapps.net/"
+      >
+        ← Back to ESD Tools
+      </a>
       {showSplash && (
         <div className="splash-screen">
           <div className="splash-content">
